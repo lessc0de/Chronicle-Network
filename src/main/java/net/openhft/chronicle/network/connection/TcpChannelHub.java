@@ -32,6 +32,7 @@ import net.openhft.chronicle.network.ConnectionStrategy;
 import net.openhft.chronicle.network.WanSimulator;
 import net.openhft.chronicle.network.api.session.SessionDetails;
 import net.openhft.chronicle.network.api.session.SessionProvider;
+import net.openhft.chronicle.network.connection.minilongmap.MiniLongMap;
 import net.openhft.chronicle.threads.*;
 import net.openhft.chronicle.wire.*;
 import org.jetbrains.annotations.NotNull;
@@ -56,6 +57,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 import static java.lang.Integer.getInteger;
 import static java.lang.ThreadLocal.withInitial;
@@ -71,7 +73,7 @@ import static net.openhft.chronicle.bytes.Bytes.elasticByteBuffer;
  * as the very first field in the message. The TcpChannelHub will look at each message and read the
  * tid, and then marshall the message onto your appropriate client thread. Created by Rob Austin
  */
-public class TcpChannelHub implements Closeable {
+public final class TcpChannelHub implements Closeable {
 
     public static final int TCP_BUFFER = getTcpBufferSize();
     public static final int SAFE_TCP_SIZE = TCP_BUFFER * 3 / 4;
@@ -109,7 +111,7 @@ public class TcpChannelHub implements Closeable {
     private final ClientConnectionMonitor clientConnectionMonitor;
     private final ConnectionStrategy connectionStrategy;
     @NotNull
-    private Pauser pauser = new LongPauser(100, 100, 500, 20_000, TimeUnit.MICROSECONDS);
+    private final Pauser pauser;
     // private final String description;
     private long largestChunkSoFar = 0;
     @Nullable
@@ -121,6 +123,7 @@ public class TcpChannelHub implements Closeable {
     private long limitOfLast = 0;
     private boolean shouldSendCloseMessage;
     private HandlerPriority priority;
+
     public TcpChannelHub(@Nullable final SessionProvider sessionProvider,
                          @NotNull final EventLoop eventLoop,
                          @NotNull final WireType wireType,
@@ -130,6 +133,28 @@ public class TcpChannelHub implements Closeable {
                          @Nullable ClientConnectionMonitor clientConnectionMonitor,
                          @NotNull final HandlerPriority monitor,
                          @NotNull final ConnectionStrategy connectionStrategy) {
+        this(sessionProvider,
+                eventLoop,
+                wireType,
+                name,
+                socketAddressSupplier,
+                shouldSendCloseMessage,
+                clientConnectionMonitor,
+                monitor,
+                connectionStrategy,
+                null);
+    }
+
+    public TcpChannelHub(@Nullable final SessionProvider sessionProvider,
+                         @NotNull final EventLoop eventLoop,
+                         @NotNull final WireType wireType,
+                         @NotNull final String name,
+                         @NotNull final SocketAddressSupplier socketAddressSupplier,
+                         boolean shouldSendCloseMessage,
+                         @Nullable ClientConnectionMonitor clientConnectionMonitor,
+                         @NotNull final HandlerPriority monitor,
+                         @NotNull final ConnectionStrategy connectionStrategy,
+                         @Nullable final Supplier<Pauser> pauserSupplier) {
         assert !name.trim().isEmpty();
         this.connectionStrategy = connectionStrategy;
         this.priority = monitor;
@@ -149,6 +174,7 @@ public class TcpChannelHub implements Closeable {
         this.sessionProvider = sessionProvider;
         this.shouldSendCloseMessage = shouldSendCloseMessage;
         this.clientConnectionMonitor = clientConnectionMonitor;
+        this.pauser = (pauserSupplier != null) ? pauserSupplier.get() : new LongPauser(100, 100, 500, 20_000, TimeUnit.MICROSECONDS);
         hubs.add(this);
         eventLoop.addHandler(new PauserMonitor(pauser, "async-read", 30));
 
@@ -988,10 +1014,13 @@ public class TcpChannelHub implements Closeable {
     /**
      * uses a single read thread, to process messages to waiting threads based on their {@code tid}
      */
-    class TcpSocketConsumer implements EventHandler {
+    final class TcpSocketConsumer implements EventHandler {
+
+        private static final int SIZE = 512;
+
         @NotNull
-        private final Map<Long, Object> map = new ConcurrentHashMap<>();
-        private final Map<Long, Object> omap = new ConcurrentHashMap<>();
+        private final MiniLongMap<Object> map = MiniLongMap.create(SIZE);
+        private final MiniLongMap<Object> omap = MiniLongMap.create(SIZE);
         @NotNull
         private final ExecutorService service;
         @NotNull
@@ -1028,7 +1057,7 @@ public class TcpChannelHub implements Closeable {
         private void onReconnect() {
 
             preventSubscribeUponReconnect.forEach(this::unsubscribe);
-            map.values().forEach(v -> {
+            map.forEachValue(v -> {
                 if (v instanceof AsyncSubscription) {
                     if (!(v instanceof AsyncTemporarySubscription))
                         ((AsyncSubscription) v).applySubscribe();
@@ -1039,7 +1068,7 @@ public class TcpChannelHub implements Closeable {
 
         @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
         void onConnectionClosed() {
-            map.values().forEach(v -> {
+            map.forEachValue(v -> {
                 if (v instanceof Bytes)
                     synchronized (v) {
                         v.notifyAll();
@@ -1796,17 +1825,9 @@ public class TcpChannelHub implements Closeable {
         }
 
         private void keepSubscriptionsAndClearEverythingElse() {
-
             tid = 0;
             omap.clear();
-
-            @NotNull final Set<Long> keys = new HashSet<>(map.keySet());
-
-            keys.forEach(k -> {
-                final Object o = map.get(k);
-                if (o instanceof Bytes || o instanceof AsyncTemporarySubscription)
-                    map.remove(k);
-            });
+            map.removeIf((k, v) -> v instanceof Bytes || v instanceof AsyncTemporarySubscription);
         }
 
         void prepareToShutdown() {
