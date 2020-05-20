@@ -96,8 +96,8 @@ public class VerySimpleClientTest {
         eg.close();
         TcpChannelHub.closeAllHubs();
         TCPRegistry.reset();
-        inWire.bytes().release();
-        outWire.bytes().release();
+        inWire.bytes().releaseLast();
+        outWire.bytes().releaseLast();
     }
 
     @Test

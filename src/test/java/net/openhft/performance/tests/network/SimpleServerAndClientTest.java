@@ -129,7 +129,7 @@ public class SimpleServerAndClientTest {
             } finally {
                 TcpChannelHub.closeAllHubs();
                 TCPRegistry.reset();
-                bytes.release();
+                bytes.releaseLast();
             }
         }
     }

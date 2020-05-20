@@ -40,7 +40,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static net.openhft.chronicle.network.connection.TcpChannelHub.TCP_BUFFER;
 
@@ -298,9 +297,9 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
     public void loopFinished() {
         // Release unless already released
         if (inBBB.refCount() > 0)
-            inBBB.release();
+            inBBB.releaseLast();
         if (outBBB.refCount() > 0)
-        outBBB.release();
+            outBBB.releaseLast();
     }
 
     public void onInBBFul() {

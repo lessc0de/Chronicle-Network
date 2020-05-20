@@ -66,6 +66,7 @@ import static java.lang.ThreadLocal.withInitial;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.*;
 import static net.openhft.chronicle.bytes.Bytes.elasticByteBuffer;
+import static net.openhft.chronicle.network.connection.CoreFields.tid;
 
 /**
  * The TcpChannelHub is used to send your messages to the server and then read the servers response.
@@ -77,16 +78,9 @@ import static net.openhft.chronicle.bytes.Bytes.elasticByteBuffer;
  */
 public final class TcpChannelHub implements Closeable {
 
-    private static final boolean hasAssert;
-
-    static {
-        boolean x = false;
-        assert x = true;
-        hasAssert = x;
-    }
-
     public static final int TCP_BUFFER = getTcpBufferSize();
     static final int SAFE_TCP_SIZE = TCP_BUFFER * 3 / 4;
+    private static final boolean hasAssert;
     private static final int HEATBEAT_PING_PERIOD =
             getInteger("heartbeat.ping.period",
                     Jvm.isDebug() ? 30_000 : 5_000);
@@ -96,6 +90,13 @@ public final class TcpChannelHub implements Closeable {
     private static final int SIZE_OF_SIZE = 4;
     private static final Set<TcpChannelHub> hubs = new CopyOnWriteArraySet<>();
     private static final Logger LOG = LoggerFactory.getLogger(TcpChannelHub.class);
+
+    static {
+        boolean x = false;
+        assert x = true;
+        hasAssert = x;
+    }
+
     final long timeoutMs;
     @NotNull
     private final String name;
@@ -191,7 +192,7 @@ public final class TcpChannelHub implements Closeable {
         // has to be done last as it starts a thread which uses this class.
         this.tcpSocketConsumer = new TcpSocketConsumer();
     }
-    
+
     private static int getTcpBufferSize() {
         final String sizeStr = System.getProperty("TcpEventHandler.tcpBufferSize");
         if (sizeStr != null && !sizeStr.isEmpty())
@@ -564,8 +565,8 @@ public final class TcpChannelHub implements Closeable {
             }
         }
 
-        outWire.bytes().release();
-        handShakingWire.bytes().release();
+        outWire.bytes().releaseLast();
+        handShakingWire.bytes().releaseLast();
     }
 
     /**
@@ -578,8 +579,9 @@ public final class TcpChannelHub implements Closeable {
 
             TcpChannelHub.this.writeMetaDataForKnownTID(0, outWire, null, 0);
 
-            TcpChannelHub.this.outWire.writeDocument(false, w ->
-                    w.writeEventName(EventId.onClientClosing).text(""));
+            try (DocumentContext dc = outWire.writingDocument()) {
+                outWire.writeEventName(EventId.onClientClosing).text("");
+            }
 
         }, TryLock.LOCK);
     }
@@ -868,9 +870,10 @@ public final class TcpChannelHub implements Closeable {
             // trip time
             long timestamp = valueIn.int64();
             TcpChannelHub.this.writeMetaDataForKnownTID(0, outWire, null, 0);
-            TcpChannelHub.this.outWire.writeDocument(false, w ->
-                    // send back the time stamp that was sent from the server
-                    w.writeEventName(EventId.heartbeatReply).int64(timestamp));
+            try (DocumentContext dc = outWire.writingDocument()) {
+                // send back the time stamp that was sent from the server
+                outWire.writeEventName(EventId.heartbeatReply).int64(timestamp);
+            }
             writeSocket(outWire(), false);
 
         } finally {
@@ -895,12 +898,12 @@ public final class TcpChannelHub implements Closeable {
                                          final long cid) {
         assert outBytesLock().isHeldByCurrentThread();
 
-        try(DocumentContext dc = wire.writingDocument(true)){
+        try (DocumentContext dc = wire.writingDocument(true)) {
             if (cid == 0)
-                dc.wire().writeEventName(CoreFields.csp).text(csp);
+                wire.writeEventName(CoreFields.csp).text(csp);
             else
-                dc.wire().writeEventName(CoreFields.cid).int64(cid);
-            dc.wire().writeEventName(CoreFields.tid).int64(tid);
+                wire.writeEventName(CoreFields.cid).int64(cid);
+            wire.writeEventName(CoreFields.tid).int64(tid);
         }
     }
 
@@ -917,12 +920,13 @@ public final class TcpChannelHub implements Closeable {
                                  final long cid) {
         assert outBytesLock().isHeldByCurrentThread();
 
-        wire.writeDocument(true, wireOut -> {
+        try (DocumentContext dc = wire.writingDocument(true)) {
             if (cid == 0)
-                wireOut.writeEventName(CoreFields.csp).text(csp);
+                wire.writeEventName(CoreFields.csp).text(csp);
             else
-                wireOut.writeEventName(CoreFields.cid).int64(cid);
-        });
+                wire.writeEventName(CoreFields.cid).int64(cid);
+        }
+        ;
     }
 
     public boolean lock(@NotNull final Task r) {
@@ -1392,7 +1396,7 @@ public final class TcpChannelHub implements Closeable {
                 if (!isShuttingdown())
                     Jvm.warn().on(getClass(), e);
             } finally {
-                inWire.bytes().release();
+                inWire.bytes().releaseLast();
                 closeSocket();
             }
         }
@@ -1718,8 +1722,8 @@ public final class TcpChannelHub implements Closeable {
                     public void onSubscribe(@NotNull WireOut wireOut) {
                         if (Jvm.isDebug())
                             LOG.info("sending heartbeat");
-                        wireOut.writeEventName(EventId.heartbeat).int64(Time
-                                .currentTimeMillis());
+                        wireOut.writeEventName(EventId.heartbeat)
+                                .int64(Time.currentTimeMillis());
                     }
 
                     @Override
@@ -1751,7 +1755,7 @@ public final class TcpChannelHub implements Closeable {
 
             Threads.shutdown(service);
 
-            serverHeartBeatHandler.release();
+            serverHeartBeatHandler.releaseLast();
 
             isShutdown = true;
         }
@@ -1772,7 +1776,7 @@ public final class TcpChannelHub implements Closeable {
             // HEATBEAT_PING_PERIOD milliseconds
             final long currentTime = Time.currentTimeMillis();
             final long millisecondsSinceLastMessageReceived = currentTime - lastTimeMessageReceivedOrSent;
-            final  long millisecondsSinceLastHeatbeatSend = currentTime - lastheartbeatSentTime;
+            final long millisecondsSinceLastHeatbeatSend = currentTime - lastheartbeatSentTime;
 
             if (millisecondsSinceLastMessageReceived >= HEATBEAT_PING_PERIOD &&
                     millisecondsSinceLastHeatbeatSend >= HEATBEAT_PING_PERIOD) {
@@ -1900,7 +1904,7 @@ public final class TcpChannelHub implements Closeable {
         }
 
         private void tidReader(WireIn w) {
-            this.tid = CoreFields.tid(w);
+            this.tid = tid(w);
         }
     }
 }

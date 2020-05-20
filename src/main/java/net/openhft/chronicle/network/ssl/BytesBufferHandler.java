@@ -67,7 +67,7 @@ public final class BytesBufferHandler<N extends NetworkContext<N>> implements Bu
             delegateHandler.process(applicationInput, applicationOutput, networkContext);
             output.position((int) applicationOutput.writePosition());
         } finally {
-            applicationOutput.release();
+            applicationOutput.releaseLast();
         }
 
         input.position((int) applicationInput.readPosition());
