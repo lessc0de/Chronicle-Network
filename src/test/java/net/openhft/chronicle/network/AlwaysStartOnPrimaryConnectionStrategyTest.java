@@ -1,5 +1,6 @@
 package net.openhft.chronicle.network;
 
+import net.openhft.chronicle.bytes.BytesUtil;
 import net.openhft.chronicle.network.connection.FatalFailureMonitor;
 import net.openhft.chronicle.network.connection.SocketAddressSupplier;
 import org.junit.After;
@@ -15,6 +16,11 @@ public class AlwaysStartOnPrimaryConnectionStrategyTest {
     @After
     public void teardown() {
         TCPRegistry.reset();
+    }
+
+    @After
+    public void checkRegisteredBytes() {
+        BytesUtil.checkRegisteredBytes();
     }
 
     @Before

@@ -17,7 +17,6 @@
 package net.openhft.chronicle.network;
 
 import net.openhft.chronicle.bytes.Bytes;
-import net.openhft.chronicle.bytes.BytesUtil;
 import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.Maths;
 import net.openhft.chronicle.core.OS;
@@ -53,7 +52,6 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
     public static final int TARGET_WRITE_SIZE = Integer.getInteger("TcpEventHandler.targetWriteSize", 1024);
     public static boolean DISABLE_TCP_NODELAY = Boolean.getBoolean("disable.tcp_nodelay");
 
-
     static {
         if (DISABLE_TCP_NODELAY) System.out.println("tcpNoDelay disabled");
     }
@@ -70,8 +68,6 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
     @NotNull
     private final Bytes<ByteBuffer> outBBB;
     private final boolean fair;
-    @NotNull
-    private final AtomicBoolean scClosed = new AtomicBoolean();
     @NotNull
     private final AtomicBoolean closed = new AtomicBoolean();
     private int oneInTen;
@@ -118,9 +114,6 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
 
         inBBB = Bytes.elasticByteBuffer(TCP_BUFFER + OS.pageSize());
         outBBB = Bytes.elasticByteBuffer(TCP_BUFFER);
-        // TODO Fix Chronicle-Queue-Enterprise tests so socket connections are closed cleanly.
-        BytesUtil.unregister(inBBB);
-        BytesUtil.unregister(outBBB);
 
         // must be set after we take a slice();
         outBBB.underlyingObject().limit(0);
@@ -260,7 +253,7 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
                             lastTickReadTime += heartbeatListener.lingerTimeBeforeDisconnect();
                         } else {
                             tcpHandler.onEndOfConnection(true);
-                            closeSC();
+                            close();
                             throw new InvalidEventHandlerException("heartbeat timeout");
                         }
                     }
@@ -295,11 +288,8 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
 
     @Override
     public void loopFinished() {
-        // Release unless already released
-        if (inBBB.refCount() > 0)
-            inBBB.releaseLast();
-        if (outBBB.refCount() > 0)
-            outBBB.releaseLast();
+        inBBB.releaseLast();
+        outBBB.releaseLast();
     }
 
     public void onInBBFul() {
@@ -418,22 +408,14 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
                 heartbeatListener.onMissedHeartbeat();
 
         } finally {
-            closeSC();
+            close();
         }
     }
 
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
-            closeSC();
-            // NOTE Do not release buffers here as they might be in use. Wait for loopFinished() to do it
-            // Note: loopFinished() may actually be called before close() if a InvalidEventHandlerException is thrown
-        }
-    }
-
-    @PackageLocal
-    void closeSC() {
-        if (scClosed.compareAndSet(false, true)) {
+            // NOTE Do not release buffers here as they might be in use. loopFinished() (called from event loop) will do it
             Closeable.closeQuietly(tcpHandler);
             Closeable.closeQuietly(this.nc.networkStatsListener());
             Closeable.closeQuietly(sc);
@@ -458,7 +440,7 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
         writeLog.log(outBB, start, outBB.position());
 
         if (wrote < 0) {
-            closeSC();
+            close();
         } else if (wrote > 0) {
             outBB.compact().flip();
             outBBB.writePosition(outBB.limit());
@@ -498,7 +480,7 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
                     busy = tryWrite(outBB);
             }
         } catch (ClosedChannelException cce) {
-            closeSC();
+            close();
 
         } catch (IOException e) {
             if (!closed.get())

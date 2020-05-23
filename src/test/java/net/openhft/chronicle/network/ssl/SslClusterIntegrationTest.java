@@ -1,9 +1,11 @@
 package net.openhft.chronicle.network.ssl;
 
+import net.openhft.chronicle.bytes.BytesUtil;
 import net.openhft.chronicle.core.pool.ClassAliasPool;
 import net.openhft.chronicle.network.AcceptorEventHandler;
 import net.openhft.chronicle.network.TCPRegistry;
 import net.openhft.chronicle.wire.TextWire;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -31,6 +33,11 @@ public final class SslClusterIntegrationTest {
         TCPRegistry.createServerSocketChannelFor("host1.port", "host2.port");
     }
 
+    @After
+    public void checkRegisteredBytes() {
+        BytesUtil.checkRegisteredBytes();
+    }
+
     @Test
     public void shouldManageBidirectionalCommunication() throws Exception {
         startHost(1, nodeOne);
@@ -51,6 +58,5 @@ public final class SslClusterIntegrationTest {
                 () -> new SslTestClusteredNetworkContext((byte) hostId, node, clusterContext.eventLoop()));
 
         clusterContext.eventLoop().addHandler(acceptorEventHandler);
-
     }
 }
