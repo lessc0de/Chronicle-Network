@@ -25,7 +25,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 
-@FunctionalInterface
 public interface TcpHandler<N extends NetworkContext<N>> extends ClientClosedProvider, Closeable {
 
     /**

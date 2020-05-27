@@ -24,6 +24,7 @@ import net.openhft.chronicle.bytes.BytesUtil;
 import net.openhft.chronicle.bytes.ConnectionDroppedException;
 import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.StackTrace;
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.core.io.IORuntimeException;
 import net.openhft.chronicle.core.threads.EventHandler;
@@ -76,7 +77,7 @@ import static net.openhft.chronicle.network.connection.CoreFields.tid;
  * as the very first field in the message. The TcpChannelHub will look at each message and read the
  * tid, and then marshall the message onto your appropriate client thread. Created by Rob Austin
  */
-public final class TcpChannelHub implements Closeable {
+public final class TcpChannelHub extends AbstractCloseable {
 
     public static final int TCP_BUFFER = getTcpBufferSize();
     static final int SAFE_TCP_SIZE = TCP_BUFFER * 3 / 4;

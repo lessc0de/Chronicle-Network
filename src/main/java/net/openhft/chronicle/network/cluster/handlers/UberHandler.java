@@ -23,16 +23,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static net.openhft.chronicle.network.HeaderTcpHandler.HANDLER;
 import static net.openhft.chronicle.network.cluster.TerminatorHandler.terminationHandler;
 
-public final class UberHandler<T extends ClusteredNetworkContext<T>> extends CspTcpHandler<T> implements
-        Demarshallable,
-        WriteMarshallable {
+public final class UberHandler<T extends ClusteredNetworkContext<T>>
+        extends CspTcpHandler<T>
+        implements Demarshallable, WriteMarshallable {
 
     private final int remoteIdentifier;
     private final int localIdentifier;
     @NotNull
     private final AtomicBoolean isClosing = new AtomicBoolean();
-    @NotNull
-    private final AtomicBoolean closed = new AtomicBoolean();
     @NotNull
     private final String clusterName;
 
@@ -63,16 +61,6 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
         wireType(wireType);
     }
 
-    @Override
-    public String toString() {
-        return "UberHandler{" +
-                "clusterName='" + clusterName + '\'' +
-                ", remoteIdentifier=" + remoteIdentifier +
-                ", localIdentifier=" + localIdentifier +
-                ", isClosing=" + isClosing +
-                '}';
-    }
-
     private static WriteMarshallable uberHandler(final WriteMarshallable m) {
         return wire -> {
             try (final DocumentContext ignored = wire.writingDocument(true)) {
@@ -87,6 +75,16 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
         } catch (RuntimeException e) {
             return "Failed to peek at contents due to: " + e.getMessage();
         }
+    }
+
+    @Override
+    public String toString() {
+        return "UberHandler{" +
+                "clusterName='" + clusterName + '\'' +
+                ", remoteIdentifier=" + remoteIdentifier +
+                ", localIdentifier=" + localIdentifier +
+                ", isClosing=" + isClosing +
+                '}';
     }
 
     public int remoteIdentifier() {
@@ -197,20 +195,20 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
+        if (isClosed())
+            return;
 
-            if (!isClosing.getAndSet(true) && connectionChangedNotifier != null)
-                connectionChangedNotifier.onConnectionChanged(false, nc());
+        if (!isClosing.getAndSet(true) && connectionChangedNotifier != null)
+            connectionChangedNotifier.onConnectionChanged(false, nc());
 
-            try {
-                final ConnectionListener listener = nc().acquireConnectionListener();
-                if (listener != null)
-                    listener.onDisconnected(localIdentifier, remoteIdentifier(), nc().isAcceptor());
-            } catch (Exception e) {
-                Jvm.fatal().on(getClass(), "close:", e);
+        try {
+            final ConnectionListener listener = nc().acquireConnectionListener();
+            if (listener != null)
+                listener.onDisconnected(localIdentifier, remoteIdentifier(), nc().isAcceptor());
+        } catch (Exception e) {
+            Jvm.fatal().on(getClass(), "close:", e);
             }
             super.close();
-        }
     }
 
     @Override
@@ -292,14 +290,16 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
 
     public static final class Factory<T extends ClusteredNetworkContext<T>> implements
             BiFunction<ClusterContext<T>,
-            HostDetails,
-            WriteMarshallable>,
+                    HostDetails,
+                    WriteMarshallable>,
             Demarshallable {
 
         @UsedViaReflection
-        private Factory(@NotNull WireIn wireIn) {}
+        private Factory(@NotNull WireIn wireIn) {
+        }
 
-        public Factory() {}
+        public Factory() {
+        }
 
         @NotNull
         public WriteMarshallable apply(@NotNull final ClusterContext<T> clusterContext,

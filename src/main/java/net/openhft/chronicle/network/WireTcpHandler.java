@@ -18,6 +18,7 @@ package net.openhft.chronicle.network;
 
 import net.openhft.chronicle.bytes.Bytes;
 import net.openhft.chronicle.core.Jvm;
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.network.api.TcpHandler;
 import net.openhft.chronicle.network.connection.WireOutPublisher;
@@ -32,7 +33,9 @@ import static net.openhft.chronicle.wire.WireType.BINARY;
 import static net.openhft.chronicle.wire.WireType.DELTA_BINARY;
 import static net.openhft.chronicle.wire.WriteMarshallable.EMPTY;
 
-public abstract class WireTcpHandler<T extends NetworkContext<T>> implements TcpHandler<T>, NetworkContextManager<T> {
+public abstract class WireTcpHandler<T extends NetworkContext<T>>
+        extends AbstractCloseable
+        implements TcpHandler<T>, NetworkContextManager<T> {
 
     private static final int SIZE_OF_SIZE = 4;
     private static final Logger LOG = LoggerFactory.getLogger(WireTcpHandler.class);
@@ -359,8 +362,8 @@ public abstract class WireTcpHandler<T extends NetworkContext<T>> implements Tcp
 
     @Override
     public void close() {
-        closed = true;
         Closeable.closeQuietly(nc);
+        super.close();
     }
 
     protected void publish(final WriteMarshallable w) {

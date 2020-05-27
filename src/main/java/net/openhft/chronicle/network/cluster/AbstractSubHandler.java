@@ -16,6 +16,7 @@
 
 package net.openhft.chronicle.network.cluster;
 
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.network.NetworkContext;
 import net.openhft.chronicle.network.api.session.SubHandler;
@@ -24,14 +25,15 @@ import net.openhft.chronicle.wire.WireOut;
 import net.openhft.chronicle.wire.WriteMarshallable;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class AbstractSubHandler<T extends NetworkContext<T>> implements SubHandler<T> {
+public abstract class AbstractSubHandler<T extends NetworkContext<T>>
+        extends AbstractCloseable
+        implements SubHandler<T> {
     private Closeable closeable;
     private T nc;
     private long cid;
     private String csp;
     private int remoteIdentifier;
     private int localIdentifier;
-    private boolean isClosed;
 
     @Override
     public void cid(long cid) {
@@ -98,13 +100,4 @@ public abstract class AbstractSubHandler<T extends NetworkContext<T>> implements
         return localIdentifier;
     }
 
-    @Override
-    public void close() {
-        isClosed = true;
-    }
-
-    @Override
-    public boolean isClosed() {
-        return isClosed;
-    }
 }

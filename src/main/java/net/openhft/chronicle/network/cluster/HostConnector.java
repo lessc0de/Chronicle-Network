@@ -16,6 +16,7 @@
 
 package net.openhft.chronicle.network.cluster;
 
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.core.threads.EventLoop;
 import net.openhft.chronicle.network.NetworkStatsListener;
@@ -31,7 +32,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-public class HostConnector<T extends ClusteredNetworkContext<T>> implements Closeable {
+public class HostConnector<T extends ClusteredNetworkContext<T>>
+        extends AbstractCloseable {
 
     private final WireType wireType;
 
@@ -65,6 +67,8 @@ public class HostConnector<T extends ClusteredNetworkContext<T>> implements Clos
 
     @Override
     public synchronized void close() {
+        if (isClosed())
+            return;
         WireOutPublisher wp = wireOutPublisher.getAndSet(null);
 
         SocketChannel socketChannel = nc.socketChannel();
@@ -75,7 +79,7 @@ public class HostConnector<T extends ClusteredNetworkContext<T>> implements Clos
 
         if (wp != null)
             wp.close();
-
+        super.close();
     }
 
     public synchronized void bootstrap(WriteMarshallable subscription) {

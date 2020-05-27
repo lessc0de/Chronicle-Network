@@ -20,8 +20,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
-public final class HeartbeatHandler<T extends ClusteredNetworkContext<T>> extends AbstractSubHandler<T> implements
-        Demarshallable, WriteMarshallable, HeartbeatEventHandler {
+public final class HeartbeatHandler<T extends ClusteredNetworkContext<T>> extends AbstractSubHandler<T>
+        implements Demarshallable, WriteMarshallable, HeartbeatEventHandler {
 
     private final long heartbeatIntervalMs;
     private final long heartbeatTimeoutMs;
@@ -149,6 +149,16 @@ public final class HeartbeatHandler<T extends ClusteredNetworkContext<T>> extend
         return result;
     }
 
+    public String name() {
+        return "rid=" + HeartbeatHandler.this.remoteIdentifier() + ", " +
+                "lid=" + HeartbeatHandler.this.localIdentifier();
+    }
+
+    @Override
+    public String toString() {
+        return "HeartbeatHandler{" + name() + "}";
+    }
+
     public static class Factory<T extends ClusteredNetworkContext<T>> implements Function<ClusterContext<T>, WriteMarshallable>,
             Demarshallable {
 
@@ -167,16 +177,6 @@ public final class HeartbeatHandler<T extends ClusteredNetworkContext<T>> extend
             return heartbeatHandler(heartbeatTimeoutMs, heartbeatIntervalMs,
                     HeartbeatHandler.class.hashCode());
         }
-    }
-
-    public String name() {
-        return "rid=" + HeartbeatHandler.this.remoteIdentifier() + ", " +
-                "lid=" + HeartbeatHandler.this.localIdentifier();
-    }
-
-    @Override
-    public String toString() {
-        return "HeartbeatHandler{" + name() + "}";
     }
 
     private static class WriteHeartbeatHandler implements WriteMarshallable {

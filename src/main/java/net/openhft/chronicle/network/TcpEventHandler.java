@@ -21,6 +21,7 @@ import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.Maths;
 import net.openhft.chronicle.core.OS;
 import net.openhft.chronicle.core.annotation.PackageLocal;
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.core.io.IORuntimeException;
 import net.openhft.chronicle.core.tcp.ISocketChannel;
@@ -42,15 +43,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static net.openhft.chronicle.network.connection.TcpChannelHub.TCP_BUFFER;
 
-public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandler, Closeable, TcpEventHandlerManager<T> {
+public class TcpEventHandler<T extends NetworkContext<T>>
+        extends AbstractCloseable
+        implements EventHandler, Closeable, TcpEventHandlerManager<T> {
 
+    public static final int TARGET_WRITE_SIZE = Integer.getInteger("TcpEventHandler.targetWriteSize", 1024);
     private static final int MONITOR_POLL_EVERY_SEC = Integer.getInteger("tcp.event.monitor.secs", 10);
     private static final long NBR_WARNING_NANOS = Long.getLong("tcp.nbr.warning.nanos", 2_000_000);
     private static final long NBW_WARNING_NANOS = Long.getLong("tcp.nbw.warning.nanos", 2_000_000);
     private static final Logger LOG = LoggerFactory.getLogger(TcpEventHandler.class);
     private static final AtomicBoolean FIRST_HANDLER = new AtomicBoolean();
-    public static final int TARGET_WRITE_SIZE = Integer.getInteger("TcpEventHandler.targetWriteSize", 1024);
     public static boolean DISABLE_TCP_NODELAY = Boolean.getBoolean("disable.tcp_nodelay");
+
 
     static {
         if (DISABLE_TCP_NODELAY) System.out.println("tcpNoDelay disabled");
@@ -69,7 +73,8 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
     private final Bytes<ByteBuffer> outBBB;
     private final boolean fair;
     @NotNull
-    private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean scClosed = new AtomicBoolean();
+
     private int oneInTen;
     @Nullable
     private volatile TcpHandler<T> tcpHandler;
@@ -107,7 +112,7 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
                 checkBufSize(sock.getSendBufferSize(), "send");
             }
         } catch (IOException e) {
-            if (closed.get() || !sc.isOpen())
+            if (closed || !sc.isOpen())
                 throw new IORuntimeException(e);
             Jvm.warn().on(getClass(), e);
         }
@@ -155,11 +160,6 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
         return sc;
     }
 
-    @Override
-    public boolean isClosed() {
-        return closed.get();
-    }
-
     @NotNull
     @Override
     public HandlerPriority priority() {
@@ -194,7 +194,7 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
     public synchronized boolean action() throws InvalidEventHandlerException {
         Jvm.optionalSafepoint();
 
-        if (closed.get())
+        if (isClosed())
             throw new InvalidEventHandlerException();
 
         if (tcpHandler == null)
@@ -414,13 +414,15 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
-            // NOTE Do not release buffers here as they might be in use. loopFinished() (called from event loop) will do it
-            Closeable.closeQuietly(tcpHandler);
-            Closeable.closeQuietly(this.nc.networkStatsListener());
-            Closeable.closeQuietly(sc);
-            Closeable.closeQuietly(nc);
-        }
+        if (closed)
+            return;
+
+        // NOTE Do not release buffers here as they might be in use. loopFinished() (called from event loop) will do it
+        Closeable.closeQuietly(tcpHandler);
+        Closeable.closeQuietly(this.nc.networkStatsListener());
+        Closeable.closeQuietly(sc);
+        Closeable.closeQuietly(nc);
+        super.close();
     }
 
     @PackageLocal
@@ -449,17 +451,6 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
         return false;
     }
 
-    public static class Factory<T extends NetworkContext<T>> implements MarshallableFunction<T, TcpEventHandler<T>> {
-        public Factory() {
-        }
-
-        @NotNull
-        @Override
-        public TcpEventHandler<T> apply(@NotNull T nc) {
-            return new TcpEventHandler<T>(nc);
-        }
-    }
-
     public boolean writeAction() {
         Jvm.optionalSafepoint();
 
@@ -483,9 +474,20 @@ public class TcpEventHandler<T extends NetworkContext<T>> implements EventHandle
             close();
 
         } catch (IOException e) {
-            if (!closed.get())
+            if (!isClosed())
                 handleIOE(e, tcpHandler.hasClientClosed(), nc.heartbeatListener());
         }
         return busy;
+    }
+
+    public static class Factory<T extends NetworkContext<T>> implements MarshallableFunction<T, TcpEventHandler<T>> {
+        public Factory() {
+        }
+
+        @NotNull
+        @Override
+        public TcpEventHandler<T> apply(@NotNull T nc) {
+            return new TcpEventHandler<T>(nc);
+        }
     }
 }

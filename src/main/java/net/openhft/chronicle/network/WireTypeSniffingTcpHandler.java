@@ -17,6 +17,7 @@
 package net.openhft.chronicle.network;
 
 import net.openhft.chronicle.bytes.Bytes;
+import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.network.api.TcpHandler;
 import net.openhft.chronicle.network.connection.WireOutPublisher;
 import net.openhft.chronicle.wire.WireType;
@@ -32,7 +33,9 @@ import static net.openhft.chronicle.wire.WireType.*;
  *
  * @author Rob Austin.
  */
-public class WireTypeSniffingTcpHandler<T extends NetworkContext<T>> implements TcpHandler<T> {
+public class WireTypeSniffingTcpHandler<T extends NetworkContext<T>>
+        extends AbstractCloseable
+        implements TcpHandler<T> {
 
     @NotNull
     private final TcpEventHandler handlerManager;
