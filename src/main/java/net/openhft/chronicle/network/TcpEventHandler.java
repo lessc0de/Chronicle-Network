@@ -480,7 +480,6 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         } else if (wrote > 0) {
             if (outBB.hasRemaining()) {
                 if (shouldCompactOutBB(outBB)) {
-                    System.out.println("Compacting");
                     outBB.compact()
                             .flip();
                     outBBB.writePosition(outBB.limit());
