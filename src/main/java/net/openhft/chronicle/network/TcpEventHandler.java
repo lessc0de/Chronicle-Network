@@ -464,7 +464,7 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         final int start = outBB.position();
         final long beginNs = System.nanoTime();
         assert !sc.isBlocking();
-        int wrote = sc.write(outBB);
+        final int wrote = sc.write(outBB);
         long elapsedNs = System.nanoTime() - beginNs;
         if (nbWarningEnabled && elapsedNs > NBW_WARNING_NANOS)
             statusMonitorEventHandler.add(new ThreadLogTypeElapsedRecord(LogType.WRITE, elapsedNs));
@@ -477,11 +477,30 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         if (wrote < 0) {
             close();
         } else if (wrote > 0) {
-            outBB.compact().flip();
-            outBBB.writePosition(outBB.limit());
+            if (outBB.hasRemaining()) {
+                if (shouldCompactOutBB(outBB)) {
+                    outBB.compact().flip();
+                    outBBB.writePosition(outBB.limit());
+                    outBBB.readPosition(0);
+                }
+            } else {
+                // We have written everything in the
+                // Buffer to the socket so we can
+                // restart at the beginning of the Buffer
+                outBB.clear();
+                outBBB.writePosition(0); // This sets the readPosition to zero too
+            }
             return true;
         }
         return false;
+    }
+
+    private boolean shouldCompactOutBB(final ByteBuffer bb) {
+        // Only compact if we can regain at least half the
+        // Buffer. This prevents massive successive copying
+        // of messages if the socket is stalled. See #85
+        return bb.position() >= bb.capacity();
+        //return outBBB.readPosition() >= outBBB.capacity();
     }
 
     public boolean writeAction() {
