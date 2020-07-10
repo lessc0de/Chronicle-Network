@@ -480,6 +480,7 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         } else if (wrote > 0) {
             if (outBB.hasRemaining()) {
                 if (shouldCompactOutBB(outBB)) {
+                    System.out.println("Compacting");
                     outBB.compact()
                             .flip();
                     outBBB.writePosition(outBB.limit());
@@ -497,13 +498,13 @@ public class TcpEventHandler<T extends NetworkContext<T>>
     }
 
     private boolean shouldCompactOutBB(final ByteBuffer bb) {
-        // Only compact if we can regain at least 25% the
+        // Only compact if we can regain at least 12.5% the
         // Buffer. This prevents massive successive copying
         // of messages if the socket is stalled and only accepts
         // a limited number of bytes on each write attempt. See #85
         // As a drawback, this will reduce the effective buffer size
-        // by 25%.
-        return bb.position() >= bb.capacity() / 4;
+        // by 12.5%.
+        return bb.position() >= bb.capacity() / 8;
         //return outBBB.readPosition() >= outBBB.capacity() / 2;
     }
 
