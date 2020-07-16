@@ -92,8 +92,6 @@ public class VanillaWireOutPublisher extends AbstractCloseable implements WireOu
      */
     @Override
     public void applyAction(@NotNull WireOut outWire) {
-        throwExceptionIfClosed();
-
         applyAction(outWire.bytes());
 
         for (int y = 1; y < 1000; y++) {
