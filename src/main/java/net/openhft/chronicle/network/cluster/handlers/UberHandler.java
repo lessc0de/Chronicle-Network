@@ -31,6 +31,9 @@ import net.openhft.chronicle.wire.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,12 +82,22 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
         wireType(wireType);
     }
 
+    static Set<WireOut> handled = Collections.synchronizedSet(new HashSet<>());
+
     private static WriteMarshallable uberHandler(final WriteMarshallable m) {
-        return wire -> {
+        WriteMarshallable x = wire -> {
+          //  long wp = wire.bytes().writePosition();
+
+            if (!handled.add(wire)) {
+                System.out.println("");
+            }
+
             try (final DocumentContext ignored = wire.writingDocument(true)) {
                 wire.write(() -> HANDLER).typedMarshallable(m);
             }
         };
+
+        return x;
     }
 
     private static String peekContents(@NotNull final DocumentContext dc) {
@@ -197,8 +210,7 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
     }
 
     /**
-     * wait 2 seconds before closing the socket connection, this should allow time of the
-     * termination event to be sent.
+     * wait 2 seconds before closing the socket connection, this should allow time of the termination event to be sent.
      */
     private void closeSoon() {
         if (isClosing.compareAndSet(false, true)) {
