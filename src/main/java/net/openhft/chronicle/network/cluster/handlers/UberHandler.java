@@ -31,9 +31,6 @@ import net.openhft.chronicle.wire.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,22 +45,23 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
         Demarshallable,
         WriteMarshallable {
 
+    private static final long IDEAL_BUFFER_SIZE = 64 << 10;
+
     private final int remoteIdentifier;
     private final int localIdentifier;
     @NotNull
     private final AtomicBoolean isClosing = new AtomicBoolean();
     @NotNull
     private final String clusterName;
-
     @Nullable
     private ConnectionChangedNotifier<T> connectionChangedNotifier;
 
     @UsedViaReflection
     private UberHandler(@NotNull final WireIn wire) {
-        remoteIdentifier = wire.read(() -> "remoteIdentifier").int32();
-        localIdentifier = wire.read(() -> "localIdentifier").int32();
-        @Nullable final WireType wireType = wire.read(() -> "wireType").object(WireType.class);
-        clusterName = wire.read(() -> "clusterName").text();
+        remoteIdentifier = wire.read("remoteIdentifier").int32();
+        localIdentifier = wire.read("localIdentifier").int32();
+        @Nullable final WireType wireType = wire.read("wireType").object(WireType.class);
+        clusterName = wire.read("clusterName").text();
         wireType(wireType);
     }
 
@@ -82,22 +80,12 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
         wireType(wireType);
     }
 
-    static Set<WireOut> handled = Collections.synchronizedSet(new HashSet<>());
-
     private static WriteMarshallable uberHandler(final WriteMarshallable m) {
-        WriteMarshallable x = wire -> {
-          //  long wp = wire.bytes().writePosition();
-
-            if (!handled.add(wire)) {
-                System.out.println("");
-            }
-
+        return wire -> {
             try (final DocumentContext ignored = wire.writingDocument(true)) {
-                wire.write(() -> HANDLER).typedMarshallable(m);
+                wire.write(HANDLER).typedMarshallable(m);
             }
         };
-
-        return x;
     }
 
     private static String peekContents(@NotNull final DocumentContext dc) {
@@ -129,10 +117,10 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
 
     @Override
     public void writeMarshallable(@NotNull final WireOut wire) {
-        wire.write(() -> "remoteIdentifier").int32(localIdentifier);
-        wire.write(() -> "localIdentifier").int32(remoteIdentifier);
-        wire.write(() -> "wireType").object(wireType);
-        wire.write(() -> "clusterName").text(clusterName);
+        wire.write("remoteIdentifier").int32(localIdentifier);
+        wire.write("localIdentifier").int32(remoteIdentifier);
+        wire.write("wireType").object(wireType);
+        wire.write("clusterName").text(clusterName);
     }
 
     @Override
@@ -301,13 +289,16 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
      */
     @Override
     protected void onWrite(@NotNull final WireOut outWire) {
-        for (int i = 0; i < writers.size(); i++)
+        if (outWire.bytes().writeRemaining() >= IDEAL_BUFFER_SIZE)
+            return;
+
+        for (WritableSubHandler<T> writer : writers)
             try {
                 if (isClosing.get())
                     return;
-                final WritableSubHandler<T> w = writers.get(i);
-                if (w != null)
-                    w.onWrite(outWire);
+                if (writer == null)
+                    continue;
+                writer.onWrite(outWire);
             } catch (Exception e) {
                 Jvm.fatal().on(getClass(), "onWrite:", e);
             }
