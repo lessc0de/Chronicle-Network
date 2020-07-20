@@ -18,6 +18,7 @@
 package net.openhft.performance.tests.network;
 
 import net.openhft.chronicle.bytes.Bytes;
+import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.io.AbstractReferenceCounted;
 import net.openhft.chronicle.core.threads.EventLoop;
 import net.openhft.chronicle.network.*;
@@ -37,6 +38,7 @@ import java.util.Collection;
 import java.util.function.Function;
 
 import static net.openhft.performance.tests.network.LegacyHanderFactory.simpleTcpEventHandlerFactory;
+import static org.junit.Assume.assumeFalse;
 
 /*
 Running on an i7-3970X
@@ -135,7 +137,8 @@ public class WireTcpHandlerTest extends NetworkTestCommon {
 
     @Test
     public void testProcess() throws IOException {
-// TODO FIX
+        // TODO FIX
+        assumeFalse(Jvm.isArm());
         AbstractReferenceCounted.disableReferenceTracing();
 
         try (@NotNull EventLoop eg = new EventGroup(true)) {
