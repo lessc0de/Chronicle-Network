@@ -349,14 +349,6 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         return true;
     }
 
-    @Override
-
-    public void loopFinished() {
-        // Release unless already released
-        inBBB.releaseLast();
-        outBBB.releaseLast();
-    }
-
     public void onInBBFul() {
         LOG.trace("inBB is full, can't read from socketChannel");
     }
@@ -460,6 +452,9 @@ public class TcpEventHandler<T extends NetworkContext<T>>
 
     @Override
     protected void performClose() {
+        inBBB.releaseLast();
+        outBBB.releaseLast();
+
         closeQuietly(tcpHandler, this.nc.networkStatsListener(), sc, nc);
     }
 

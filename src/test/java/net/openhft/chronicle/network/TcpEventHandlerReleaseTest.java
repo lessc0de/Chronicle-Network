@@ -22,7 +22,6 @@ public class TcpEventHandlerReleaseTest extends NetworkTestCommon {
     @Test
     public void testRelease() throws IOException {
         try (TcpEventHandler t = createTcpEventHandler()) {
-            t.loopFinished();
             t.close();
             // check second close OK
         }
@@ -37,8 +36,6 @@ public class TcpEventHandlerReleaseTest extends NetworkTestCommon {
                 fail();
             } catch (InvalidEventHandlerException e) {
                 // expected.
-            } finally {
-                t.loopFinished();
             }
         }
     }
