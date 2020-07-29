@@ -18,12 +18,12 @@
 package net.openhft.chronicle.network.connection;
 
 import net.openhft.chronicle.bytes.Bytes;
-import net.openhft.chronicle.bytes.ConnectionDroppedException;
 import net.openhft.chronicle.core.Jvm;
 import net.openhft.chronicle.core.io.IORuntimeException;
 import net.openhft.chronicle.core.io.SimpleCloseable;
 import net.openhft.chronicle.core.util.ThrowingSupplier;
 import net.openhft.chronicle.core.util.Time;
+import net.openhft.chronicle.network.ConnectionDroppedException;
 import net.openhft.chronicle.wire.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -77,15 +77,15 @@ public abstract class AbstractStatelessClient<E extends ParameterizeWireKey>
     /**
      * Returns a WriteValue for the provided {@code eventId} and
      * provided {@code argument}.
-     *
+     * <p>
      * This is a specialized one-parameter implementation of
      * {@link #toParameters(ParameterizeWireKey, Object...)} which
      * avoids creation of an array and lambda.
      *
      * @param eventId to used
-     * @param arg single argument
+     * @param arg     single argument
      * @return a WriteValue for the provided {@code eventId} and
-     *         provided {@code argument}.
+     * provided {@code argument}.
      */
     protected WriteValue toParameters(@NotNull final E eventId,
                                       @Nullable final Object arg) {
@@ -118,7 +118,7 @@ public abstract class AbstractStatelessClient<E extends ParameterizeWireKey>
         };
     }
 
-@Nullable
+    @Nullable
     protected <R> R proxyReturnWireTypedObject(
             @NotNull final E eventId,
             @Nullable final R usingValue,
@@ -190,13 +190,11 @@ public abstract class AbstractStatelessClient<E extends ParameterizeWireKey>
 
         if (usingValue == null) {
             // Avoid having to create the same lambda over and over again.
-            @SuppressWarnings("unchecked")
-            final Function<ValueIn, R> consumerInFunction = (Function<ValueIn, R>) consumerInFunctionMap.computeIfAbsent(resultType, c -> (f -> f.object(c)));
+            @SuppressWarnings("unchecked") final Function<ValueIn, R> consumerInFunction = (Function<ValueIn, R>) consumerInFunctionMap.computeIfAbsent(resultType, c -> (f -> f.object(c)));
             return consumerInFunction;
         } else {
             // use a per-class ThreadLocal to avoid lambda creation.
-            @SuppressWarnings("unchecked")
-            final ConsumerInUsingFunction<R> consumerInUsingFunctionThreadLocal =
+            @SuppressWarnings("unchecked") final ConsumerInUsingFunction<R> consumerInUsingFunctionThreadLocal =
                     (ConsumerInUsingFunction<R>) consumerInFunctionUsingTL.get();
             consumerInUsingFunctionThreadLocal.using(usingValue);
             consumerInUsingFunctionThreadLocal.resultType(resultType);
