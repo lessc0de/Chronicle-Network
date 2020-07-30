@@ -344,8 +344,6 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         return true;
     }
 
-    @Override
-
     public void loopFinished() {
         // Release unless already released
         inBBB.releaseLast();
