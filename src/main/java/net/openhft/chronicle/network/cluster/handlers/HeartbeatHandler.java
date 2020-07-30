@@ -196,7 +196,7 @@ public final class HeartbeatHandler<T extends ClusteredNetworkContext<T>> extend
         return "HeartbeatHandler{" + name() + "}";
     }
 
-    private static class  WriteHeartbeatHandler implements WriteMarshallable {
+    private static class WriteHeartbeatHandler implements WriteMarshallable {
         private final long cid;
         private final long heartbeatTimeoutMs;
         private final long heartbeatIntervalMs;

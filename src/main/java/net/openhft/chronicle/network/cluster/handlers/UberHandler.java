@@ -198,7 +198,8 @@ public final class UberHandler<T extends ClusteredNetworkContext<T>> extends Csp
     }
 
     /**
-     * wait 2 seconds before closing the socket connection, this should allow time of the termination event to be sent.
+     * wait 2 seconds before closing the socket connection, this should allow time of the
+     * termination event to be sent.
      */
     private void closeSoon() {
         if (isClosing.compareAndSet(false, true)) {
