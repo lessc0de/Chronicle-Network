@@ -22,7 +22,6 @@ import net.openhft.chronicle.core.annotation.PackageLocal;
 import net.openhft.chronicle.core.io.AbstractCloseable;
 import net.openhft.chronicle.core.io.Closeable;
 import net.openhft.chronicle.core.io.IORuntimeException;
-import net.openhft.chronicle.core.io.SimpleCloseable;
 import net.openhft.chronicle.core.threads.EventHandler;
 import net.openhft.chronicle.core.threads.EventLoop;
 import net.openhft.chronicle.core.threads.HandlerPriority;
@@ -46,7 +45,7 @@ import java.util.concurrent.locks.LockSupport;
 
 import static net.openhft.chronicle.network.NetworkStatsListener.notifyHostPort;
 
-public class RemoteConnector<T extends NetworkContext<T>> extends SimpleCloseable {
+public class RemoteConnector<T extends NetworkContext<T>> extends AbstractCloseable {
 
     @NotNull
     private final ThrowingFunction<T, TcpEventHandler<T>, IOException> tcpHandlerSupplier;
@@ -65,12 +64,10 @@ public class RemoteConnector<T extends NetworkContext<T>> extends SimpleCloseabl
         Closeable.closeQuietly(socketChannel);
     }
 
-/*
     @Override
     protected boolean threadSafetyCheck(boolean isUsed) {
         return true;
     }
-*/
 
     public void connect(@NotNull final String remoteHostPort,
                         @NotNull final EventLoop eventLoop,

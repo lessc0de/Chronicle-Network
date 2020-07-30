@@ -19,6 +19,7 @@ package net.openhft.chronicle.network.cluster;
 
 import net.openhft.chronicle.network.NetworkContext;
 
+@FunctionalInterface
 public interface ConnectionChangedNotifier<T extends NetworkContext<T>> {
-    void onConnectionChanged(boolean isConnected, final T nc, boolean terminated);
+    void onConnectionChanged(boolean isConnected, final T nc);
 }

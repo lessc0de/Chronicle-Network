@@ -180,9 +180,7 @@ public class VanillaNetworkContext<T extends VanillaNetworkContext<T>>
 
     @Override
     protected void performClose() {
-        Closeable.closeQuietly(
-                wireOutPublisher,
-                networkStatsListener);
+        Closeable.closeQuietly(networkStatsListener);
     }
 
     @Override

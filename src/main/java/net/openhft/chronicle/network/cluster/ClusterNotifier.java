@@ -46,16 +46,16 @@ class ClusterNotifier implements TerminationEventHandler, ConnectionChangedNotif
         if (hostConnector.connectUri() == null || hostConnector.connectUri().isEmpty())
             return;
 
-        hostConnector.connect();
+         hostConnector.connect();
     }
 
     @Override
-    public void onConnectionChanged(boolean isConnected, final NetworkContext nc, boolean terminated) {
-        if (terminated)
-            this.terminated.set(true);
+    public void onConnectionChanged(boolean isConnected, final NetworkContext nc) {
+
         if (!isConnected)
             onClose();
-        connectionManager.onConnectionChanged(isConnected, nc, terminated);
+
+        connectionManager.onConnectionChanged(isConnected, nc);
     }
 
     private void onClose() {
@@ -75,7 +75,7 @@ class ClusterNotifier implements TerminationEventHandler, ConnectionChangedNotif
     public void onTerminate(final NetworkContext nc) {
         terminated.set(true);
         hostConnector.close();
-        connectionManager.onConnectionChanged(false, nc, true);
+        connectionManager.onConnectionChanged(false, nc);
     }
 
     @Override

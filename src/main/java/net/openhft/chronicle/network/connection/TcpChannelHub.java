@@ -1750,7 +1750,7 @@ public final class TcpChannelHub extends AbstractCloseable {
                 subscribe(new AbstractAsyncTemporarySubscription(TcpChannelHub.this, null, name) {
                     @Override
                     public void onSubscribe(@NotNull WireOut wireOut) {
-                        LOG.debug("sending heartbeat");
+                        LOG.info("sending heartbeat");
                         wireOut.writeEventName(EventId.heartbeat).int64(Time
                                 .currentTimeMillis());
                     }
