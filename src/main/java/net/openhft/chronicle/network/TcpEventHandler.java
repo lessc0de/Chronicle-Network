@@ -344,6 +344,14 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         return true;
     }
 
+    @Override
+
+    public void loopFinished() {
+        // Release unless already released
+        inBBB.releaseLast();
+        outBBB.releaseLast();
+    }
+
     public void onInBBFul() {
         LOG.trace("inBB is full, can't read from socketChannel");
     }
@@ -447,9 +455,6 @@ public class TcpEventHandler<T extends NetworkContext<T>>
 
     @Override
     protected void performClose() {
-        inBBB.releaseLast();
-        outBBB.releaseLast();
-
         closeQuietly(tcpHandler, this.nc.networkStatsListener(), sc, nc);
     }
 
@@ -473,33 +478,11 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         if (wrote < 0) {
             close();
         } else if (wrote > 0) {
-            if (outBB.hasRemaining()) {
-                if (shouldCompactOutBB(outBB)) {
-                    outBB.compact()
-                            .flip();
-                    outBBB.writePosition(outBB.limit());
-                    outBBB.readPosition(0);
-                }
-            } else {
-                // We have written everything in the
-                // Buffer to the socket so we can
-                // restart at the beginning of the Buffer again
-                outBB.clear();
-                outBBB.writePosition(0); // This sets the readPosition to zero too
-            }
+            outBB.compact().flip();
+            outBBB.writePosition(outBB.limit());
+            return true;
         }
         return false;
-    }
-
-    private boolean shouldCompactOutBB(final ByteBuffer bb) {
-        // Only compact if we can regain at least 12.5% the
-        // Buffer. This prevents massive successive copying
-        // of messages if the socket is stalled and only accepts
-        // a limited number of bytes on each write attempt. See #85
-        // As a drawback, this will reduce the effective buffer size
-        // by 12.5%.
-        return bb.position() >= bb.capacity() / 8;
-        //return outBBB.readPosition() >= outBBB.capacity() / 2;
     }
 
     public boolean writeAction() {
