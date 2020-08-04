@@ -135,7 +135,7 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
             throwExceptionIfClosed();
 
             if (isClosed() || eventLoop.isClosed())
-                throw new InvalidEventHandlerException();
+                throw InvalidEventHandlerException.reusable();
             final long time = System.currentTimeMillis();
 
             if (time > nextPeriod.get()) {
@@ -179,11 +179,15 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
                 // we have died.
                 Closeable.closeQuietly(eventHandler);
             else {
-                eventLoop.addHandler(eventHandler);
-                closeables.add(() -> closeSocket(sc));
+                try {
+                    eventLoop.addHandler(eventHandler);
+                    closeables.add(() -> closeSocket(sc));
+                } catch (IllegalStateException ignored) {
+
+                }
             }
 
-            throw new InvalidEventHandlerException();
+            throw InvalidEventHandlerException.reusable();
         }
 
         @NotNull
