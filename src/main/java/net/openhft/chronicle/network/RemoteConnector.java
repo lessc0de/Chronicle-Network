@@ -60,7 +60,7 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
         this.tcpHandlerSupplier = tcpEventHandlerFactory;
     }
 
-    private static void closeSocket(Closeable socketChannel) {
+    private static void closeSocket(final Closeable socketChannel) {
         Closeable.closeQuietly(socketChannel);
     }
 
@@ -92,10 +92,10 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
     }
 
     @PackageLocal
-    ChronicleSocketChannel openSocketChannel(InetSocketAddress socketAddress) throws IOException {
+    ChronicleSocketChannel openSocketChannel(@NotNull final InetSocketAddress socketAddress) throws IOException {
         final ChronicleSocketChannel result = ChronicleSocketChannelFactory.wrap(socketAddress);
         result.configureBlocking(false);
-        ChronicleSocket socket = result.socket();
+        final ChronicleSocket socket = result.socket();
         if (!TcpEventHandler.DISABLE_TCP_NODELAY) socket.setTcpNoDelay(true);
         socket.setReceiveBufferSize(tcpBufferSize);
         socket.setSendBufferSize(tcpBufferSize);
@@ -104,7 +104,7 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
         return result;
     }
 
-    private class RCEventHandler extends AbstractCloseable implements EventHandler, Closeable {
+    private final class RCEventHandler extends AbstractCloseable implements EventHandler {
 
         private final InetSocketAddress address;
         private final AtomicLong nextPeriod = new AtomicLong();
@@ -113,10 +113,11 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
         private final EventLoop eventLoop;
         private final long retryInterval;
 
-        RCEventHandler(String remoteHostPort,
-                       T nc,
-                       EventLoop eventLoop,
-                       InetSocketAddress address, long retryInterval) {
+        RCEventHandler(@NotNull final String remoteHostPort,
+                       @NotNull final T nc,
+                       @NotNull final EventLoop eventLoop,
+                       @NotNull final InetSocketAddress address,
+                       final long retryInterval) {
             this.remoteHostPort = remoteHostPort;
             this.nc = nc;
             this.eventLoop = eventLoop;
@@ -183,7 +184,7 @@ public class RemoteConnector<T extends NetworkContext<T>> extends AbstractClosea
                     eventLoop.addHandler(eventHandler);
                     closeables.add(() -> closeSocket(sc));
                 } catch (IllegalStateException ignored) {
-
+                    // addHandler() might fail
                 }
             }
 
