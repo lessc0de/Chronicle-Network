@@ -474,19 +474,10 @@ public class TcpEventHandler<T extends NetworkContext<T>>
         if (wrote < 0) {
             close();
         } else if (wrote > 0) {
-            if (outBB.hasRemaining()) {
-                if (shouldCompactOutBB(outBB)) {
-                    outBB.compact()
-                            .flip();
-                    outBBB.writePosition(outBB.limit());
-                    outBBB.readPosition(0);
-                }
-            } else {
-                // We have written everything in the
-                // Buffer to the socket so we can
-                // restart at the beginning of the Buffer again
-                outBB.clear();
-                outBBB.writePosition(0); // This sets the readPosition to zero too
+            if (shouldCompactOutBB(outBB)) {
+                outBB.compact()
+                        .flip();
+                outBBB.writePosition(outBB.limit());
             }
             return true;
         }
